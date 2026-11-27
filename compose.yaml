@@ -1,6 +1,25 @@
 name: nexus-ai
 
 services:
+  postgres:
+    image: postgres:17.12-bookworm
+    profiles: [shared]
+    environment:
+      POSTGRES_DB: nexus_ai
+      POSTGRES_USER: nexus_admin
+      POSTGRES_PASSWORD: "${NEXUS_DB_ADMIN_PASSWORD:-}"
+      NEXUS_DB_APP_PASSWORD: "${NEXUS_DB_APP_PASSWORD:-}"
+    volumes:
+      - shared-postgres:/var/lib/postgresql/data
+      - ./infrastructure/postgres/001-registry-role.sql:/docker-entrypoint-initdb.d/001-registry-role.sql:ro
+    networks: [database]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "nexus_admin", "-d", "nexus_ai"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+    stop_grace_period: 30s
+
   ollama:
     image: ollama/ollama:0.40.18
     user: "10001:10001"
@@ -46,7 +65,16 @@ services:
         {"id":"lm-studio","name":"LM Studio","engine":"lm-studio","url":"http://lm-studio:1234"}]
       NEXUS_SOURCE_OLLAMA_TOKEN: "${NEXUS_SOURCE_OLLAMA_TOKEN:-}"
       NEXUS_SOURCE_LM_STUDIO_TOKEN: "${NEXUS_SOURCE_LM_STUDIO_TOKEN:-}"
-    networks: [default, runtime]
+      NEXUS_REGISTRY_DB_HOST: "${NEXUS_REGISTRY_DB_HOST:-}"
+      NEXUS_DB_APP_PASSWORD: "${NEXUS_DB_APP_PASSWORD:-}"
+      NEXUS_SHARED_OWNER_TOKEN: "${NEXUS_SHARED_OWNER_TOKEN:-}"
+      NEXUS_SHARED_READER_TOKEN: "${NEXUS_SHARED_READER_TOKEN:-}"
+      NEXUS_SHARED_PRINCIPALS: "${NEXUS_SHARED_PRINCIPALS:-[]}"
+    networks: [default, runtime, database]
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     healthcheck:
       test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2).close()"]
       interval: 10s
@@ -77,7 +105,10 @@ services:
 networks:
   runtime:
     internal: true
+  database:
+    internal: true
 
 volumes:
   ollama-models:
   lm-studio-models:
+  shared-postgres:
