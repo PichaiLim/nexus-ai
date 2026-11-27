@@ -1,0 +1,14 @@
+.main:has(#model-sources-root) .top :is(.previewbadge, .pill) { display: none; }
+.model-sources .btn { min-height: 44px; }
+.model-sources .btn[aria-pressed="true"] { font-weight: 700; }
+.model-sources .tiny, .model-sources .url { margin: 0; }
+.model-sources .url { color: var(--muted); overflow-wrap: anywhere; }
+.model-sources .state { text-transform: capitalize; }
+.model-sources [role="alert"], .model-sources .feedback { color: var(--muted); }
+.model-sources .feedback:empty { margin: 0; }
+.model-sources .models { list-style: none; padding: 0; margin-bottom: 0; }
+.model-sources .listline { flex-wrap: wrap; justify-content: space-between; overflow-wrap: anywhere; }
+.model-sources small { display: block; }
+@media (max-width: 560px) {
+  .model-sources .pagehead { flex-wrap: wrap; align-items: start; }
+}

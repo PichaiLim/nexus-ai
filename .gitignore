@@ -1,0 +1,30 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies & Caches
+node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+test-results/
+playwright-report/
+dist/
+build/
+coverage/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/

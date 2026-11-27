@@ -1,0 +1,17 @@
+services:
+  ollama:
+    volumes:
+      - type: bind
+        source: ${NEXUS_OLLAMA_MODELS_DIR:-${USERPROFILE}/.ollama/models}
+        target: /models
+        read_only: true
+        bind:
+          create_host_path: false
+  lm-studio:
+    volumes:
+      - type: bind
+        source: ${NEXUS_LM_STUDIO_MODELS_DIR:-${USERPROFILE}/.lmstudio/models}
+        target: /home/nexus/.lmstudio/models
+        read_only: true
+        bind:
+          create_host_path: false

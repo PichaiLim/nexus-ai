@@ -1,0 +1,83 @@
+name: nexus-ai
+
+services:
+  ollama:
+    image: ollama/ollama:0.40.18
+    user: "10001:10001"
+    environment:
+      HOME: /tmp
+      OLLAMA_HOST: "0.0.0.0:11434"
+      OLLAMA_MODELS: /models
+      OLLAMA_NO_CLOUD: "1"
+    volumes:
+      - ollama-models:/models:ro
+    networks: [runtime]
+    healthcheck:
+      test: ["CMD-SHELL", "OLLAMA_HOST=127.0.0.1:11434 ollama list"]
+      interval: 10s
+      timeout: 4s
+      retries: 5
+    stop_grace_period: 15s
+
+  lm-studio:
+    build:
+      context: .
+      dockerfile: infrastructure/lm-studio/Dockerfile
+    init: true
+    volumes:
+      - lm-studio-models:/home/nexus/.lmstudio/models:ro
+    networks: [runtime]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "3", "--output", "/dev/null", "http://127.0.0.1:1234/api/v1/models"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 20s
+    stop_grace_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NEXUS_MODEL_SOURCES: "${NEXUS_MODEL_SOURCES:-}"
+      NEXUS_DEFAULT_MODEL_SOURCES: >-
+        [{"id":"ollama","name":"Ollama","engine":"ollama","url":"http://ollama:11434"},
+        {"id":"lm-studio","name":"LM Studio","engine":"lm-studio","url":"http://lm-studio:1234"}]
+      NEXUS_SOURCE_OLLAMA_TOKEN: "${NEXUS_SOURCE_OLLAMA_TOKEN:-}"
+      NEXUS_SOURCE_LM_STUDIO_TOKEN: "${NEXUS_SOURCE_LM_STUDIO_TOKEN:-}"
+    networks: [default, runtime]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2).close()"]
+      interval: 10s
+      timeout: 4s
+      retries: 4
+      start_period: 10s
+    stop_grace_period: 15s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXUS_API_ORIGIN: http://api:8000
+    ports:
+      - "127.0.0.1:${NEXUS_WEB_PORT:-3010}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/', {signal: AbortSignal.timeout(2000)}).then(r => {if (!r.ok) process.exit(1)}).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 4s
+      retries: 4
+      start_period: 10s
+    stop_grace_period: 15s
+
+networks:
+  runtime:
+    internal: true
+
+volumes:
+  ollama-models:
+  lm-studio-models:
