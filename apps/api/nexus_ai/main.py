@@ -1,13 +1,15 @@
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import os
 from typing import Annotated
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from .discovery import ADAPTERS, Model, Snapshot
+from .shared_registry import SharedRegistry, configured_principals
 
 
 class Source(BaseModel):
@@ -44,18 +46,35 @@ class Source(BaseModel):
 def create_app(
     sources: list[Source],
     transport: httpx.AsyncBaseTransport | None = None,
+    registry: SharedRegistry | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Nexus AI Model Sources")
-    registry = {source.id: source for source in sources}
-    if len(registry) != len(sources):
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if registry is not None:
+            await registry.initialize()
+        yield
+
+    app = FastAPI(title="Nexus AI", lifespan=lifespan)
+    if registry is not None:
+        app.include_router(registry.router())
+
+        @app.middleware("http")
+        async def prevent_registry_caching(request: Request, call_next):
+            response = await call_next(request)
+            if request.url.path.startswith("/api/v1/workspaces/"):
+                response.headers["Cache-Control"] = "no-store"
+            return response
+
+    source_map = {source.id: source for source in sources}
+    if len(source_map) != len(sources):
         raise ValueError("Source IDs must be unique")
     snapshots = {source.id: Snapshot([]) for source in sources}
     sync_locks = {source.id: asyncio.Lock() for source in sources}
 
     def source_by_id(source_id: str) -> Source:
-        if source_id not in registry:
+        if source_id not in source_map:
             raise HTTPException(404, "Model source not found")
-        return registry[source_id]
+        return source_map[source_id]
 
     def view(source: Source) -> dict:
         return {"id": source.id, "name": source.name, "engine": source.engine,
@@ -105,9 +124,14 @@ def create_app(
     return app
 
 
+registry_host = os.environ.get("NEXUS_REGISTRY_DB_HOST")
+shared_registry = SharedRegistry(
+    registry_host, os.environ["NEXUS_DB_APP_PASSWORD"], configured_principals(),
+) if registry_host else None
+
 app = create_app([
     Source.model_validate(source)
     for source in json.loads(
         os.environ.get("NEXUS_MODEL_SOURCES") or os.environ.get("NEXUS_DEFAULT_MODEL_SOURCES", "[]")
     )
-])
+], registry=shared_registry)

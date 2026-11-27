@@ -1,0 +1,86 @@
+name: Nexus AI CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: API, database, and browser checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      COMPOSE_PROJECT_NAME: nexus-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      NEXUS_REGISTRY_DB_HOST: postgres
+      NEXUS_WEB_PORT: "3010"
+      NEXUS_WEB_ORIGIN: http://127.0.0.1:3010
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check committed whitespace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git diff --check "$BASE_SHA" HEAD
+          else
+            git show --check --oneline HEAD
+          fi
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.22.3"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install browser test dependencies
+        working-directory: apps/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Type-check web and browser tests
+        run: npm --prefix apps/web run typecheck
+
+      - name: Create disposable database credentials
+        run: |
+          for key in NEXUS_DB_ADMIN_PASSWORD NEXUS_DB_APP_PASSWORD; do
+            secret="$(openssl rand -hex 32)"
+            echo "::add-mask::$secret"
+            printf '%s=%s\n' "$key" "$secret" >> "$GITHUB_ENV"
+          done
+
+      - name: Build and start API, web, and PostgreSQL
+        run: docker compose --profile shared up --build --wait --wait-timeout 120 postgres api web
+
+      - name: Run API integration tests against PostgreSQL
+        run: |
+          docker compose --profile shared run --rm --no-deps \
+            --env NEXUS_TEST_SHARED_REGISTRY=1 \
+            --volume "$PWD/tests/integration:/verification:ro" \
+            api python -m unittest discover -s /verification -v
+
+      - name: Run browser checks against Docker
+        working-directory: apps/web
+        run: npx playwright test
+
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose --profile shared logs --no-color postgres api web
+
+      - name: Remove CI containers and database volume
+        if: always()
+        run: docker compose --profile shared down --volumes
