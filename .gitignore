@@ -4,6 +4,8 @@
 !.env.example
 *.pem
 *.key
+*.pfx
+*.p12
 
 # Dependencies & Caches
 node_modules/
@@ -14,14 +16,28 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.cache/
 .next/
 next-env.d.ts
 *.tsbuildinfo
-test-results/
-playwright-report/
 dist/
 build/
+
+# Test reports & logs
+test-results/
+playwright-report/
+blob-report/
 coverage/
+.coverage
+.coverage.*
+htmlcov/
+*.log
+
+# Local runtime data
+/models/
+/data/
+*.gguf
+*.safetensors
 
 # OS & Editor
 .DS_Store

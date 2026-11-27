@@ -1,12 +1,19 @@
+# Repository metadata and local credentials
 .git
 .github
 .gitignore
-.env
-.env.*
-!.env.example
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.p12
+
+# Dependencies, generated files, and caches
 **/__pycache__
 **/*.py[cod]
 **/.venv
+**/venv
 **/node_modules
 **/.next
 **/dist
@@ -14,9 +21,32 @@
 **/.pytest_cache
 **/.mypy_cache
 **/.ruff_cache
+**/.cache
 **/next-env.d.ts
 **/*.tsbuildinfo
+
+# Local tests and reports
+tests
+apps/web/tests
+apps/web/playwright.config.ts
 **/test-results
 **/playwright-report
-*.log
-.DS_Store
+**/blob-report
+**/coverage
+**/.coverage*
+**/htmlcov
+**/*.log
+
+# Model stores are mounted at runtime
+models
+data
+**/*.gguf
+**/*.safetensors
+
+# Keep the original mockup HTML in context for the web image
+docs/**/*.md
+docs/**/*.png
+**/.DS_Store
+**/Thumbs.db
+**/.vscode
+**/.idea
