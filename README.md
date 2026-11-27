@@ -19,9 +19,15 @@ Nexus AI is a self-hosted, local-first, extensible AI infrastructure platform de
 - Custom Web Management Interface
 - LAN, VPN and Secure Remote Access
 
+See the [development roadmap](docs/development-roadmap.md) and [shared Memory and Skills design](docs/adr/0002-shared-memory-and-skills.md) for implementation status and access rules.
+
+Use the [Git workflow](docs/git-workflow.md) for branches, commits, PRs, CI checks, and release tags.
+
 ## Phase 1A development
 
 The Nexus workspace uses the navigation and theme from the handoff mockup. Open **Model Studio → Model Sources** to inspect Ollama and LM Studio inventories and loaded state. Model Sources starts in Demo mode. Toggle **Live** to query configured runtimes while other workspace pages continue to display their demo state. The standalone handoff remains available at `/demo`. Source snapshots reset on API restart.
+
+Use the language selector in the workspace header to switch between English and Thai. The browser remembers the choice. Thai currently covers the shared navigation, menu search, Overview, and Model Sources. Other demo pages retain their original content.
 
 ### Docker Compose
 
@@ -73,6 +79,35 @@ npm.cmd --prefix apps/web run typecheck
 For the browser test, keep the web server running and use PowerShell from `apps/web`. Run `npx.cmd playwright install chromium` and `npx.cmd playwright test`. Set `NEXUS_WEB_ORIGIN` if the web server uses a nondefault port, or set `NEXUS_BROWSER_CHANNEL` to `msedge` to use installed Microsoft Edge.
 
 Run `npx.cmd playwright test workspace-spacing` to compare the desktop and mobile layout with the original handoff at `/demo`.
+
+## Shared Memory and Skills API
+
+Enable the shared registry once from the repository root. The setup script adds local PostgreSQL credentials and separate owner and reader tokens to the ignored `.env` file. It preserves existing settings and does not print secret values.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\initialize-shared-registry.ps1
+docker compose --profile shared -f compose.yaml -f compose.models.yaml up --build --wait
+```
+
+The Compose profile keeps PostgreSQL on a private network and stores data in the `shared-postgres` volume. Keep the existing database credentials for that volume. The app connects using the dedicated `nexus_app` role. PostgreSQL is pinned to `17.12-bookworm` and Psycopg to `3.3.9`.
+
+Use `http://127.0.0.1:3010/api/v1/workspaces/local` with an `Authorization: Bearer <token>` header. Keep the owner token with the workspace owner. Give AI clients their own reader token. For multiple identities, configure `NEXUS_SHARED_PRINCIPALS` as an array of `workspace`, `subject`, `role`, and `token_sha256` objects.
+
+| Action | Path under the workspace |
+|---|---|
+| List or search published records | `GET /memory?q=handoff` or `GET /skills?q=spacing` |
+| Read an exact record or skill version | `GET /memory/{id}` or `GET /skills/{id}` |
+| Create a private draft as owner | `POST /memory` or `POST /skills` with `title` and `content`. Skills also require `skill_key` and a positive integer `version` |
+| Publish or withdraw as owner | `POST /{memory-or-skills}/{id}/publish` or `/withdraw` |
+| Edit or delete memory as owner | `PUT /memory/{id}` or `DELETE /memory/{id}` |
+
+Run the integration suite against the Docker database after startup.
+
+```powershell
+docker compose -f compose.yaml -f compose.models.yaml run --rm --no-deps --env NEXUS_TEST_SHARED_REGISTRY=1 --volume "${PWD}/tests/integration:/verification:ro" api python -m unittest discover -s /verification -v
+```
+
+The Memory Center remains in Demo mode. Live management UI and MCP access are listed in the [development roadmap](docs/development-roadmap.md).
 
 ## Vision
 

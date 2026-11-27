@@ -18,6 +18,8 @@ Python integration tests use `unittest` and the `test_*.py` naming convention. U
 
 ## Commits and Pull Requests
 
+Follow the [Git workflow](docs/git-workflow.md) for branches, verification, PRs, releases, and rollback.
+
 Use concise, imperative commit subjects with the prefixes in the Git & Version Control Standards, such as `docs: revise README`. In pull requests, summarize the change and list what you verified. Link a related issue when one exists, and include screenshots when a change affects a visible interface. Keep the README accurate about which capabilities are available and which are planned.
 
 ## Git & Version Control Standards
