@@ -1,3 +1,9 @@
+#nexus-language { flex: none; min-height: 44px; padding-inline: 8px; }
+.top:has(#nexus-language) .crumb { min-width: 0; }
+@media (max-width: 760px) {
+  .top:has(#nexus-language) .crumb { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .top:has(#nexus-language) { gap: 8px; }
+}
 .main:has(#model-sources-root) .top :is(.previewbadge, .pill) { display: none; }
 .model-sources .btn { min-height: 44px; }
 .model-sources .btn[aria-pressed="true"] { font-weight: 700; }
